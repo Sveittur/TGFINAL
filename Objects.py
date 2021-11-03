@@ -356,3 +356,4 @@ class player():
         self.position.y += 0.1
     def jumpDown(self):
         self.position.y -= 0.1
+

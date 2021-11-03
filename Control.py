@@ -71,7 +71,7 @@ class GraphicsProgram3D:
                           GameObject(Point(-4,-0.3,-2.5),Point(0.5,1,1)),
                           GameObject(Point(-3,-0.3,-3.5),Point(0.5,1,1)),
                           GameObject(Point(-2,-0.3,-3),Point(0.5,1,1)),
-                          GameObject(Point(2,-0.3,-5),Point(0.3,1,0.3)),
+                          #GameObject(Point(2,-0.3,-5),Point(0.3,1,0.3)),
                         #   GameObject(Point(2,-0.3,-3),Point(0.3,1,0.3)),
                         #   GameObject(Point(2,-0.3,-3),Point(0.3,1,0.3)),
                         #   GameObject(Point(2,-0.3,-3),Point(0.3,1,0.3)),
@@ -82,7 +82,7 @@ class GraphicsProgram3D:
                           GameObject(Point(1,-0.3,-4),Point(0.5,1,1)),
                           GameObject(Point(-1,-0.3,-4),Point(0.5,1,1)),
                           GameObject(Point(-2,-0.3,-3),Point(0.5,1,1)),
-                          GameObject(Point(2,-0.3,-11),Point(0.3,1,0.3))
+                          GameObject(Point(2,-0.3,-16),Point(0.5,1,1))
                         #   GameObject(Point(2,-0.3,-3),Point(0.3,1,0.3)),
                         #   GameObject(Point(2,-0.3,-3),Point(0.3,1,0.3)),
                         #   GameObject(Point(2,-0.3,-3),Point(0.3,1,0.3)),
@@ -250,6 +250,7 @@ class GraphicsProgram3D:
                     self.activeEnemyList.remove(enemy)
                     newEnemy = self.spawnEnemy()
                     self.activeEnemyList.append(newEnemy)
+
                 
 
             
