@@ -41,8 +41,6 @@ from challenges import *
 
 import objLoader
 
-import requests
-
 
 
 class GraphicsProgram3D:
@@ -81,6 +79,7 @@ class GraphicsProgram3D:
         self.winning = False
         self.losing = False
         self.begin = False
+        self.gameWon = False
 
         self.enemyList = [#up
                           GameObject(Point(6,-0.3,0.5),Point(0.5,1,0.5),None,pi),
@@ -135,6 +134,7 @@ class GraphicsProgram3D:
         self.activeEnemyList = list(set(self.activeEnemyList))
         
         self.shotlist = []
+
     
 
 
@@ -158,7 +158,7 @@ class GraphicsProgram3D:
         self.knifeAnimX = 0
         self.knifeAnimY = 0
         self.knifeAnimZ = 0
-        self.stage = 2
+        self.stage = 1
 
 
         self.moveVec = Vector(0,0,0)
@@ -177,8 +177,8 @@ class GraphicsProgram3D:
         self.karambitTextureID = self.loadTexture('texture/Karambit.png')
         self.rifleTextureID = self.loadTexture('texture/ak.bmp')
         self.skyTextureID = self.loadTexture('texture/sky.jpeg')
-        self.hitmarkerColorTextureID  = self.loadTexture('texture/hitmarker.png')
-        self.hitmarkerAlphaTextureID  = self.loadTexture('texture/hitmarkerAlpha.png')
+        self.cloudySkyTextureID = self.loadTexture('texture/cloudySky.jpg')
+        self.nightSkyTextureID = self.loadTexture('texture/nightSky.jpeg')
         self.crosshairTextureID = self.loadTexture('texture/crosshair.png')
         self.crosshairAlphaTextureID = self.loadTexture('texture/crosshairAlpha.png')
         self.youWinTextureID = self.loadTexture('texture/YOUWIN.png')
@@ -197,6 +197,9 @@ class GraphicsProgram3D:
         self.stage2AlphaTextureID = self.loadTexture('texture/STAGE2ALPHA.png')
         self.targetTextureID = self.loadTexture('texture/TARGET.png')
         self.targetAlphaTextureID = self.loadTexture('texture/TARGETALPHA.png')
+        self.carbonTextureID = self.loadTexture('texture/carbon.png')
+        self.gameWonTextureID = self.loadTexture('texture/GAMEWON.png')
+        self.gameWonAlphaTextureID = self.loadTexture('texture/GAMEWONALPHA.png')
 
 
 
@@ -205,8 +208,6 @@ class GraphicsProgram3D:
         self.rifle = objLoader.load_obj_file('objects','ak.obj')
         self.enemy = objLoader.load_obj_file('objects','human.obj')
         self.karambit = objLoader.load_obj_file('objects', 'Karambit_Knife.obj')
-        self.saturn = objLoader.load_obj_file('objects', 'saturn.obj')
-        self.crosshair = objLoader.load_obj_file('objects','sphere.obj')
 
         # SHOUNDS
         self.soundboard = soundBoard()
@@ -317,7 +318,7 @@ class GraphicsProgram3D:
         #  Collision  #
         ###############
 
-            #aimbots Box
+            #Callange Box
             if shot.checkIntersection(self.challengeBox) and self.aimbots.active == False and self.flick.active == False:
                 if self.stage == 1:
                     self.aimbots.startChallenge()
@@ -325,6 +326,8 @@ class GraphicsProgram3D:
                     self.flick.startChallenge()
                 self.begin = True
                 self.stopwatch = stopwatch()
+
+
 
             ###########
             # STAGE 2 #
@@ -381,9 +384,9 @@ class GraphicsProgram3D:
                         self.activeEnemyList.append(newEnemy)
                     self.player.doCollision(enemy)
 
-
        
-        
+
+
 
             
         ###############
@@ -462,10 +465,12 @@ class GraphicsProgram3D:
                     self.stopwatch = stopwatch()
 
         if self.winning:
-            print(self.stopwatch.elapsedTime())
             if self.stopwatch.elapsedTime() > 4:
                 self.winning = False
                 self.stage += 1
+                if self.stage == 3:
+                    self.gameWon = True
+                    self.stopwatch = stopwatch()
         if self.losing:
             if self.stopwatch.elapsedTime() > 4:
                 self.losing = False
@@ -473,6 +478,15 @@ class GraphicsProgram3D:
         if self.begin:
             if self.stopwatch.elapsedTime() > 1:
                 self.begin = False
+
+        if self.gameWon:
+            if self.stopwatch.elapsedTime() > 4:
+                self.gameWon = False
+                pygame.quit()
+                quit()
+
+        
+        
                     
                        
         
@@ -510,19 +524,35 @@ class GraphicsProgram3D:
             self.model_matrix.pop_matrix()
             glEnable(GL_DEPTH_TEST)
             glClear(GL_DEPTH_BUFFER_BIT)
+
         if self.stage == 2:
-            # glActiveTexture(GL_TEXTURE0)
-            # glBindTexture(GL_TEXTURE_2D, self.skyTextureID)
-            # self.sprite_shader.set_diffuse_texture(0)
-            # self.sprite_shader.set_alpha_texture(None)
-            # self.sprite_shader.set_opacity(1.0)
-            # self.model_matrix.push_matrix()
-            # self.model_matrix.add_translation(self.view_matrix.eye.x, self.view_matrix.eye.y, self.view_matrix.eye.z - 0.08)
-            # self.sprite_shader.set_model_matrix(self.model_matrix.matrix)
-            # self.sky_sphere.draw(self.sprite_shader)
-            # self.model_matrix.pop_matrix()
-            # glEnable(GL_DEPTH_TEST)
-            # glClear(GL_DEPTH_BUFFER_BIT)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, self.nightSkyTextureID)
+            self.sprite_shader.set_diffuse_texture(0)
+            self.sprite_shader.set_alpha_texture(None)
+            self.sprite_shader.set_opacity(1.0)
+            self.model_matrix.push_matrix()
+            self.model_matrix.add_translation(self.view_matrix.eye.x, self.view_matrix.eye.y, self.view_matrix.eye.z - 0.08)
+            self.sprite_shader.set_model_matrix(self.model_matrix.matrix)
+            self.sky_sphere.draw(self.sprite_shader)
+            self.model_matrix.pop_matrix()
+            glEnable(GL_DEPTH_TEST)
+            glClear(GL_DEPTH_BUFFER_BIT)
+
+        if self.stage == 3:
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, self.cloudySkyTextureID)
+            self.sprite_shader.set_diffuse_texture(0)
+            self.sprite_shader.set_alpha_texture(None)
+            self.sprite_shader.set_opacity(1.0)
+            self.model_matrix.push_matrix()
+            self.model_matrix.add_translation(self.view_matrix.eye.x, self.view_matrix.eye.y, self.view_matrix.eye.z - 0.08)
+            self.sprite_shader.set_model_matrix(self.model_matrix.matrix)
+            self.sky_sphere.draw(self.sprite_shader)
+            self.model_matrix.pop_matrix()
+            glEnable(GL_DEPTH_TEST)
+            glClear(GL_DEPTH_BUFFER_BIT)
+
 
 
         self.shader.use()
@@ -541,6 +571,8 @@ class GraphicsProgram3D:
             self.displayChallenge1()
         if self.stage == 2:
             self.displayChallenge2()
+        if self.stage ==3:
+            self.displayChallenge3()
 
         
 
@@ -597,6 +629,24 @@ class GraphicsProgram3D:
         self.sprite_shader.set_view_matrix(self.view_matrix.get_matrix())
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        if self.stage == 2:
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, self.targetTextureID)
+            self.sprite_shader.set_diffuse_texture(0)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, self.targetAlphaTextureID)
+            self.sprite_shader.set_alpha_texture(1)
+            self.sprite_shader.set_opacity(1.0)
+            self.model_matrix.push_matrix()
+            self.model_matrix.add_translation(self.flick.circle.position.x, self.flick.circle.position.y, self.flick.circle.position.z)
+            self.model_matrix.add_scale(2,1,1)
+            self.sprite_shader.set_model_matrix(self.model_matrix.matrix)
+            self.sprite.draw(self.sprite_shader)
+            self.model_matrix.pop_matrix()
+
+       
+
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, self.crosshairTextureID)
         self.sprite_shader.set_diffuse_texture(0)
@@ -612,6 +662,7 @@ class GraphicsProgram3D:
         self.sprite_shader.set_model_matrix(self.model_matrix.matrix)
         self.sprite.draw(self.sprite_shader)
         self.model_matrix.pop_matrix()
+
 
         # You win screen
         if self.winning:
@@ -698,21 +749,25 @@ class GraphicsProgram3D:
             self.sprite_shader.set_model_matrix(self.model_matrix.matrix)
             self.sprite.draw(self.sprite_shader)
             self.model_matrix.pop_matrix()
-
-        if self.stage == 2:
+        
+        if self.gameWon:
             glActiveTexture(GL_TEXTURE0)
-            glBindTexture(GL_TEXTURE_2D, self.targetTextureID)
+            glBindTexture(GL_TEXTURE_2D, self.gameWonTextureID)
             self.sprite_shader.set_diffuse_texture(0)
             glActiveTexture(GL_TEXTURE1)
-            glBindTexture(GL_TEXTURE_2D, self.targetAlphaTextureID)
+            glBindTexture(GL_TEXTURE_2D, self.gameWonAlphaTextureID)
             self.sprite_shader.set_alpha_texture(1)
             self.sprite_shader.set_opacity(1.0)
             self.model_matrix.push_matrix()
-            self.model_matrix.add_translation(self.flick.circle.position.x, self.flick.circle.position.y, self.flick.circle.position.z)
-            self.model_matrix.add_scale(2,1,1)
+            self.model_matrix.add_translation(self.view_matrix.eye.x-self.view_matrix.n.x, self.view_matrix.eye.y - self.view_matrix.n.y, self.view_matrix.eye.z-self.view_matrix.n.z)
+            self.model_matrix.add_rotate_y(pi/2)
+            self.model_matrix.add_rotate_y(-self.view_matrix.jaw*pi/180)
+            self.model_matrix.add_scale(1, 1, 1)
             self.sprite_shader.set_model_matrix(self.model_matrix.matrix)
             self.sprite.draw(self.sprite_shader)
             self.model_matrix.pop_matrix()
+
+        
 
         
         glDisable(GL_BLEND)
@@ -842,6 +897,20 @@ class GraphicsProgram3D:
         self.shader.set_model_matrix(self.model_matrix.matrix)
         self.cube.draw(self.shader)
         self.model_matrix.pop_matrix()
+
+    def displayChallenge3(self):
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D,self.carbonTextureID)
+        self.shader.set_diffuse_texture(0)
+        self.shader.set_using_texture()
+
+        self.model_matrix.push_matrix()
+        self.model_matrix.add_translation(0,-0.45,-8.5)
+        self.model_matrix.add_scale(19,0.1,19)
+        self.shader.set_model_matrix(self.model_matrix.matrix)
+        self.cube.draw(self.shader)
+        self.model_matrix.pop_matrix()
+        
 
     def program_loop(self):
         exiting = False

@@ -332,7 +332,7 @@ class player():
         tempselfx = self.position.x
         tempselfz = self.position.z
         tempotherx = other.position.x
-        tempotherz = other.position.z
+        tempotherz = self.position.z
 
 
         if self.position.x < 0:
@@ -342,27 +342,31 @@ class player():
         
         if other.position.x < 0:
             tempotherx = abs(other.position.x) + 5
-        if self.position.z < 0:
+        if other.position.z < 0:
             tempotherz = abs(other.position.z)
 
         w = tempotherx - tempselfx
         h = tempotherz - tempselfz
         if w >= abs(h):
+            print(1)
             if self.position.x > 0:
                 self.position.x = other.minX - self.scale.x / 2
             else:
                 self.position.x = other.maxX + self.scale.x / 2
             # return True
         elif -w >= abs(h):
+            print(2)
             if self.position.x > 0:
                 self.position.x = other.maxX + self.scale.x /2
             else:
                 self.position.x = other.minX - self.scale.x / 2
             # return True
         elif h >= abs(w):
+            print(3)
             self.position.z = other.maxZ + self.scale.z / 2
             # return True
         elif -h >= abs(w):
+            print(4)
             self.position.z = other.minZ - self.scale.z / 2
 
     def jumpUp(self):
