@@ -15,8 +15,10 @@ try:
 except ImportError:
     pass
 
+from OpenGL.GL.images import PIXEL_NAMES
 from OpenGL.GLU import *
 from math import *
+import random
 from OpenGL.GL.ARB import robust_buffer_access_behavior, viewport_array
 from OpenGL.error import NullFunctionError
 from OpenGL.latebind import LateBind
@@ -33,69 +35,107 @@ import time
 
 from Shaders import *
 from Matrices import *
+from soundBoard import * 
+from challenges import *
 
 
 import objLoader
+
+import requests
 
 
 
 class GraphicsProgram3D:
     def __init__(self):
 
-        pygame.init() 
+        pygame.init()
         self.width = 1280
         self.height = 600
         self.gameDisplay = pygame.display.set_mode((self.width,self.height), pygame.OPENGL|pygame.DOUBLEBUF)
 
+
+        self.sprite_shader = SpriteShader()
+        self.sprite_shader.use()
         self.shader = Shader3D()
         self.shader.use()
+        
+        
 
         self.model_matrix = ModelMatrix()
 
         self.view_matrix = ViewMatrix()
         self.view_matrix.look(Point(5,0.2,0), Point(0,0.2,0),Vector(0,1,0))
-        self.view_matrix.eye = Point(0,0.2,-12)
+        self.view_matrix.eye = Point(0,0.2,-9)
 
         self.projection_matrix = ProjectionMatrix()
-        self.fov = 70*pi/180 # 80 deg
+        self.fov = 60*pi/180 # 80 deg
         self.projection_matrix.set_perspective(pi/2, self.width/self.height, 0.5, 100)
         self.shader.set_projection_matrix(self.projection_matrix.get_matrix())
 
         self.init_lights()
         self.player = player(Point(0,0.2,0))
-        self.enemyList = [GameObject(Point(2,-0.3,-3),Point(0.5,0.5,0.5)),
-                          GameObject(Point(3,-0.3,-3.5),Point(0.5,1,1)),
-                          GameObject(Point(4,-0.3,-2.5),Point(0.5,1,1)),
-                          GameObject(Point(1,-0.3,-4),Point(0.5,1,1)),
-                          GameObject(Point(-1,-0.3,-4),Point(0.5,1,1)),
-                          GameObject(Point(-4,-0.3,-2.5),Point(0.5,1,1)),
-                          GameObject(Point(-3,-0.3,-3.5),Point(0.5,1,1)),
-                          GameObject(Point(-2,-0.3,-3),Point(0.5,1,1)),
-                          #GameObject(Point(2,-0.3,-5),Point(0.3,1,0.3)),
-                        #   GameObject(Point(2,-0.3,-3),Point(0.3,1,0.3)),
-                        #   GameObject(Point(2,-0.3,-3),Point(0.3,1,0.3)),
-                        #   GameObject(Point(2,-0.3,-3),Point(0.3,1,0.3)),
-                        #   GameObject(Point(2,-0.3,-3),Point(0.3,1,0.3)),
-                        ]
-        self.activeEnemyList = [
-                          GameObject(Point(3,-0.3,-3.5),Point(0.5,1,1)),
-                          GameObject(Point(1,-0.3,-4),Point(0.5,1,1)),
-                          GameObject(Point(-1,-0.3,-4),Point(0.5,1,1)),
-                          GameObject(Point(-2,-0.3,-3),Point(0.5,1,1)),
-                          GameObject(Point(2,-0.3,-16),Point(0.5,1,1))
-                        #   GameObject(Point(2,-0.3,-3),Point(0.3,1,0.3)),
-                        #   GameObject(Point(2,-0.3,-3),Point(0.3,1,0.3)),
-                        #   GameObject(Point(2,-0.3,-3),Point(0.3,1,0.3)),
-                        #   GameObject(Point(2,-0.3,-3),Point(0.3,1,0.3)),
-                        #   GameObject(Point(2,-0.3,-3),Point(0.3,1,0.3)),
-                        ]
-        self.wallList = [#GameObject(Point(3,0,-1),Point(1,1,1)),
-        #                  GameObject(Point(-2,0,-1),Point(1,1,1)),
-                         #GameObject(Point(3,0,-3),Point(1,1,1)),
-                        ]
-        self.lastSpawn = None
+        self.sprite = Sprite()
+        self.sky_sphere = SkySphere(128,256)
 
+        self.challengeBox = GameObject(Point(0,0,-11),Point(0.5,0.5,0.5))
+        self.winning = False
+        self.losing = False
+        self.begin = False
+
+        self.enemyList = [#up
+                          GameObject(Point(6,-0.3,0.5),Point(0.5,1,0.5),None,pi),
+                          GameObject(Point(9,-0.3,0.5),Point(0.5,1,0.5),None,pi),
+                          GameObject(Point(3,-0.3,-1),Point(0.5,1,0.5),None,pi),
+                          GameObject(Point(-4,-0.3,-1),Point(0.5,1,0.5),None,pi),
+                          GameObject(Point(-7,-0.3,0.5),Point(0.5,1,0.5),None,pi),
+                          GameObject(Point(-8,-0.3,0.5),Point(0.5,1,0.5),None,pi),
+                          GameObject(Point(-9,-0.3,0.5),Point(0.5,1,0.5),None,pi),
+                          GameObject(Point(-6,-0.3,-0.5),Point(0.5,1,0.5),None,pi),
+                          GameObject(Point(-5,-0.3,0),Point(0.5,1,0.5),None,pi),
+                          #down
+                          GameObject(Point(6,-0.3,-12),Point(0.5,1,0.5)),
+                          GameObject(Point(9,-0.3,-13),Point(0.5,1,0.5)),
+                          GameObject(Point(3,-0.3,-16),Point(0.5,1,0.5)),
+                          GameObject(Point(-4,-0.3,-15),Point(0.5,1,0.5)),
+                          GameObject(Point(-7,-0.3,-12),Point(0.5,1,0.5)),
+                          GameObject(Point(-8,-0.3,-11),Point(0.5,1,0.5)),
+                          GameObject(Point(-9,-0.3,-15),Point(0.5,1,0.5)),
+                          GameObject(Point(-6,-0.3,-16),Point(0.5,1,0.5)),
+                          GameObject(Point(-5,-0.3,-13),Point(0.5,1,0.5)),
+                          #left
+                          GameObject(Point(9,-0.3,-1),Point(0.5,0.5,0.5),None,-pi/2),
+                          GameObject(Point(8.5,-0.3,-2),Point(0.5,1,0.5),None,-pi/2),
+                          GameObject(Point(9,-0.3,-3),Point(0.5,1,0.5),None,-pi/2),
+                          GameObject(Point(8.5,-0.3,-4),Point(0.5,1,0.5),None,-pi/2),
+                          GameObject(Point(9,-0.3,-5),Point(0.5,1,0.5),None,-pi/2),
+                          GameObject(Point(8,-0.3,-6),Point(0.5,1,0.5),None,-pi/2),
+                          GameObject(Point(9,-0.3,-7),Point(0.5,1,0.5),None,-pi/2),
+                          GameObject(Point(9,-0.3,-8),Point(0.5,1,0.5),None,-pi/2),
+                          GameObject(Point(8.5,-0.3,-9),Point(0.5,1,0.5),None,-pi/2),
+                          GameObject(Point(8,-0.3,-10),Point(0.5,1,0.5),None,-pi/2),
+                          GameObject(Point(8.5,-0.3,-11),Point(0.5,1,0.5),None,-pi/2),
+                          #right
+                          GameObject(Point(-7,-0.3,-1),Point(0.5,0.5,0.5),None,pi/2),
+                          GameObject(Point(-6.5,-0.3,-2),Point(0.5,1,0.5),None,pi/2),
+                          GameObject(Point(-7,-0.3,-3),Point(0.5,1,0.5),None,pi/2),
+                          GameObject(Point(-6.5,-0.3,-4),Point(0.5,1,0.5),None,pi/2),
+                          GameObject(Point(-7,-0.3,-5),Point(0.5,1,0.5),None,pi/2),
+                          GameObject(Point(-6,-0.3,-6),Point(0.5,1,0.5),None,pi/2),
+                          GameObject(Point(-7,-0.3,-7),Point(0.5,1,0.5),None,pi/2),
+                          GameObject(Point(-7,-0.3,-8),Point(0.5,1,0.5),None,pi/2),
+                          GameObject(Point(-6.5,-0.3,-9),Point(0.5,1,0.5),None,pi/2),
+                          GameObject(Point(-6,-0.3,-10),Point(0.5,1,0.5),None,pi/2),
+                          GameObject(Point(-6.5,-0.3,-11),Point(0.5,1,0.5),None,pi/2),
+                        ]
+        self.activeEnemyList = []
+        self.enemyList = list(set(self.enemyList))
+        for i in range(0, int((len(self.enemyList)-1)/2)):
+            newEnemy = self.spawnEnemy()
+            self.activeEnemyList.append(newEnemy)
+        self.activeEnemyList = list(set(self.activeEnemyList))
+        
         self.shotlist = []
+    
 
 
         self.cube = Cube()
@@ -118,6 +158,7 @@ class GraphicsProgram3D:
         self.knifeAnimX = 0
         self.knifeAnimY = 0
         self.knifeAnimZ = 0
+        self.stage = 2
 
 
         self.moveVec = Vector(0,0,0)
@@ -135,8 +176,28 @@ class GraphicsProgram3D:
         self.playerTextureID = self.loadTexture('texture/HuManDefuse.png')
         self.karambitTextureID = self.loadTexture('texture/Karambit.png')
         self.rifleTextureID = self.loadTexture('texture/ak.bmp')
-        self.saturnTextureID = self.loadTexture('texture/saturn.jpg')
-        self.starsTextureID = self.loadTexture('texture/stars.jpg')
+        self.skyTextureID = self.loadTexture('texture/sky.jpeg')
+        self.hitmarkerColorTextureID  = self.loadTexture('texture/hitmarker.png')
+        self.hitmarkerAlphaTextureID  = self.loadTexture('texture/hitmarkerAlpha.png')
+        self.crosshairTextureID = self.loadTexture('texture/crosshair.png')
+        self.crosshairAlphaTextureID = self.loadTexture('texture/crosshairAlpha.png')
+        self.youWinTextureID = self.loadTexture('texture/YOUWIN.png')
+        self.youWinAlphaTextureID = self.loadTexture('texture/YOUWINALPHA.png')
+        self.youLoseTextureID = self.loadTexture('texture/YOULOSE.png')
+        self.youLoseAlphaTextureID = self.loadTexture('texture/YOULOSEALPHA.png')
+        self.startTextureID = self.loadTexture('texture/START.png')
+        self.startAlphaTextureID = self.loadTexture('texture/STARTALPHA.png')
+        self.circleColorTextureID = self.loadTexture('texture/CIRCLECOLOR.png')
+        self.circleColorAlphaTextureID = self.loadTexture('texture/CIRCLECOLORALPHA.png')
+        self.gameWonTextureID = self.loadTexture('texture/GAMEWON.png')
+        self.gameWonAlphaTextureID = self.loadTexture('texture/GAMEWONALPHA.png')
+        self.stage1TextureID = self.loadTexture('texture/STAGE1.png')
+        self.stage1AlphaTextureID = self.loadTexture('texture/STAGE1ALPHA.png')
+        self.stage2TextureID = self.loadTexture('texture/STAGE2.png')
+        self.stage2AlphaTextureID = self.loadTexture('texture/STAGE2ALPHA.png')
+        self.targetTextureID = self.loadTexture('texture/TARGET.png')
+        self.targetAlphaTextureID = self.loadTexture('texture/TARGETALPHA.png')
+
 
 
         # OBJECTS
@@ -146,6 +207,18 @@ class GraphicsProgram3D:
         self.karambit = objLoader.load_obj_file('objects', 'Karambit_Knife.obj')
         self.saturn = objLoader.load_obj_file('objects', 'saturn.obj')
         self.crosshair = objLoader.load_obj_file('objects','sphere.obj')
+
+        # SHOUNDS
+        self.soundboard = soundBoard()
+
+        # CHALLENGES
+        self.aimbots = aimbots()
+        self.flick = flickGame()
+
+
+        
+
+
 
 
     
@@ -173,6 +246,7 @@ class GraphicsProgram3D:
     def update(self):
         delta_time = self.clock.tick() / 1000.0
         velocity = self.player.velocity
+        self.activeEnemyList = list(set(self.activeEnemyList))
         ##########
         # PLAYER #
         ##########
@@ -227,42 +301,89 @@ class GraphicsProgram3D:
         self.player.update(Point(self.view_matrix.eye.x,self.view_matrix.eye.y,self.view_matrix.eye.z))
 
         for shot in self.shotlist:
-            print(shot.position.y)
-            shot.position += Vector(-shot.vector.x,-shot.vector.y,-shot.vector.z)
+            shot.position += Vector(-shot.vector.x/2,-shot.vector.y/2,-shot.vector.z/2)
             shot.update(shot.position)
             if shot.position.x < -20 or shot.position.x > 20:
                 self.shotlist.remove(shot)
                 continue
             if shot.position.z < -20 or shot.position.z > 20:
                 self.shotlist.remove(shot)
+                continue
+
             
         
 
         ###############
         #  Collision  #
         ###############
-            for wall in self.wallList:
-                if shot.checkIntersection(wall):
-                    self.shotlist.remove(shot)
-                    self.wallList.remove(wall)
-            for enemy in self.activeEnemyList:
-                if shot.checkIntersection(enemy):
-                    self.activeEnemyList.remove(enemy)
-                    newEnemy = self.spawnEnemy()
-                    self.activeEnemyList.append(newEnemy)
 
+            #aimbots Box
+            if shot.checkIntersection(self.challengeBox) and self.aimbots.active == False and self.flick.active == False:
+                if self.stage == 1:
+                    self.aimbots.startChallenge()
+                if self.stage == 2:
+                    self.flick.startChallenge()
+                self.begin = True
+                self.stopwatch = stopwatch()
+
+            ###########
+            # STAGE 2 #
+            ###########
+            if self.stage == 2:
+                if self.flick.circle.checkIntersection(shot):
+                    if self.flick.active:
+                        self.flick.killCount += 1
+                        self.flick.updateCircle()
+                        self.shotlist.remove(shot)
+                        continue
+
+            ###########
+            # STAGE 1 #
+            ###########
+
+            if self.stage == 1:
+                for enemy in self.activeEnemyList:
+                    if shot.checkIntersection(enemy):
+                        if self.shotlist == []:
+                            continue
+                        if self.active_slot == 3:
+                            enemy.health -= 100
+                            
+                        if self.active_slot == 2:
+                            enemy.health -= 14
+                        if self.active_slot == 1:
+                            enemy.health -= 34
+                            if enemy.maxY - shot.position.y <= 0.08:
+                                enemy.health -= 76
+                                self.soundboard.playHeadshot()
+
+                        if enemy.health <= 0:
+                            enemy.health = 100
+                            self.activeEnemyList.remove(enemy)
+                            newEnemy = self.spawnEnemy(enemy)
+                            self.activeEnemyList.append(newEnemy)
+                            self.activeEnemyList = list(set(self.activeEnemyList))
+                            if self.aimbots.active:
+                                self.aimbots.killCount += 1
                 
+                        if shot in self.shotlist:
+                            self.shotlist.remove(shot)
 
             
-        for wall in self.wallList:
-            if self.player.checkIntersection(wall):
-                self.player.doCollision(wall)
-        for enemy in self.activeEnemyList:
-            if self.player.checkIntersection(enemy):
-                if self.knifing:
-                    self.activeEnemyList.remove(enemy)
-                    newEnemy = self.spawnEnemy()
-                    self.activeEnemyList.append(newEnemy)
+        if self.stage == 1:
+            for enemy in self.activeEnemyList:
+                if self.player.checkIntersection(enemy):
+                    if self.knifing:
+                        self.soundboard.stopKnifeWiff()
+                        self.soundboard.playKnifeKill()
+                        self.activeEnemyList.remove(enemy)
+                        newEnemy = self.spawnEnemy()
+                        self.activeEnemyList.append(newEnemy)
+                    self.player.doCollision(enemy)
+
+
+       
+        
 
             
         ###############
@@ -285,23 +406,127 @@ class GraphicsProgram3D:
                 self.player.position.y = 0.2
             
         # Set camera pos to player pos
-        self.view_matrix.eye = self.player.position
-        
+        self.view_matrix.eye = self.player.position 
+        if self.aimbots.active:
+            for enemy in self.activeEnemyList:
+                if self.aimbots.dir == "right":
+                    if enemy.yRotation == None:
+                        enemy.position.x -= 0.5 * delta_time
+
+                    if enemy.yRotation == pi:
+                        enemy.position.x += 0.5 * delta_time
+
+                    if enemy.yRotation == pi/2:
+                        enemy.position.z += 0.5 * delta_time
+
+                    if enemy.yRotation == -pi/2:
+                        enemy.position.z -= 0.5 * delta_time
+
+                elif self.aimbots.dir == "left":
+                    if enemy.yRotation == None:
+                        enemy.position.x += 0.5 * delta_time
+
+                    if enemy.yRotation == pi:
+                        enemy.position.x -= 0.5 * delta_time
+
+                    if enemy.yRotation == pi/2:
+                        enemy.position.z -= 0.5 * delta_time
+                        
+                    if enemy.yRotation == -pi/2:
+                        enemy.position.z += 0.5 * delta_time
+                enemy.update()
+
+            if int (self.aimbots.stopwatch.elapsedTime()) % 2 == 0:
+                if self.aimbots.dir == "right":
+                    self.aimbots.dir = "left"
+                else:
+                    self.aimbots.dir = "right"
+
+            if self.aimbots.killCount == 10:
+                self.aimbots.stopChallenge()
+                if self.aimbots.checkWin():
+                    self.winning = True
+                    self.stopwatch = stopwatch()
+                else:
+                    self.losing = True
+                    self.stopwatch = stopwatch()
+                    
+        if self.flick.active:
+            if self.flick.killCount == 30:
+                self.flick.stopChallenge()
+                if self.flick.checkWin():
+                    self.winning = True
+                    self.stopwatch = stopwatch()
+                else:
+                    self.losing = True
+                    self.stopwatch = stopwatch()
+
+        if self.winning:
+            print(self.stopwatch.elapsedTime())
+            if self.stopwatch.elapsedTime() > 4:
+                self.winning = False
+                self.stage += 1
+        if self.losing:
+            if self.stopwatch.elapsedTime() > 4:
+                self.losing = False
+
+        if self.begin:
+            if self.stopwatch.elapsedTime() > 1:
+                self.begin = False
+                    
+                       
         
 
 
 
 
     def display(self):
-        
         glEnable(GL_DEPTH_TEST)  ### --- NEED THIS FOR NORMAL 3D BUT MANY EFFECTS BETTER WITH glDisable(GL_DEPTH_TEST) ... try it! --- ###
-
+        glEnable(GL_FRAMEBUFFER_SRGB)
+        glShadeModel(GL_SMOOTH)
+        glLoadIdentity()
+        glMatrixMode(GL_PROJECTION)
         glClearColor(0.0, 0.0, 0.0, 1.0)
-        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)  ### --- YOU CAN ALSO CLEAR ONLY THE COLOR OR ONLY THE DEPTH --- ###
+        glClear(GL_COLOR_BUFFER_BIT)  ### --- YOU CAN ALSO CLEAR ONLY THE COLOR OR ONLY THE DEPTH --- ###
 
         glViewport(0, 0, self.width, self.height)
 
-        self.projection_matrix.set_perspective(self.fov, self.width/self.height, 0.5, 100)
+        self.model_matrix.load_identity()
+        self.sprite_shader.use()
+        self.sprite_shader.set_projection_matrix(self.projection_matrix.get_matrix())
+        self.sprite_shader.set_view_matrix(self.view_matrix.get_matrix())
+        
+        glDisable(GL_DEPTH_TEST)
+        if self.stage == 1:
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, self.skyTextureID)
+            self.sprite_shader.set_diffuse_texture(0)
+            self.sprite_shader.set_alpha_texture(None)
+            self.sprite_shader.set_opacity(1.0)
+            self.model_matrix.push_matrix()
+            self.model_matrix.add_translation(self.view_matrix.eye.x, self.view_matrix.eye.y, self.view_matrix.eye.z - 0.08)
+            self.sprite_shader.set_model_matrix(self.model_matrix.matrix)
+            self.sky_sphere.draw(self.sprite_shader)
+            self.model_matrix.pop_matrix()
+            glEnable(GL_DEPTH_TEST)
+            glClear(GL_DEPTH_BUFFER_BIT)
+        if self.stage == 2:
+            # glActiveTexture(GL_TEXTURE0)
+            # glBindTexture(GL_TEXTURE_2D, self.skyTextureID)
+            # self.sprite_shader.set_diffuse_texture(0)
+            # self.sprite_shader.set_alpha_texture(None)
+            # self.sprite_shader.set_opacity(1.0)
+            # self.model_matrix.push_matrix()
+            # self.model_matrix.add_translation(self.view_matrix.eye.x, self.view_matrix.eye.y, self.view_matrix.eye.z - 0.08)
+            # self.sprite_shader.set_model_matrix(self.model_matrix.matrix)
+            # self.sky_sphere.draw(self.sprite_shader)
+            # self.model_matrix.pop_matrix()
+            # glEnable(GL_DEPTH_TEST)
+            # glClear(GL_DEPTH_BUFFER_BIT)
+
+
+        self.shader.use()
+        self.projection_matrix.set_perspective(self.fov , self.width/self.height, 0.5, 100)
         self.shader.set_projection_matrix(self.projection_matrix.get_matrix())
         self.shader.set_view_matrix(self.view_matrix.get_matrix())
 
@@ -312,60 +537,14 @@ class GraphicsProgram3D:
         self.shader.set_material_shininess(10)
         self.model_matrix.load_identity()
         
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D,self.wallTextureID)
-        self.shader.set_diffuse_texture(0)
-        self.shader.set_using_texture()
-
-        self.model_matrix.push_matrix()
-        self.model_matrix.add_translation(0,-0.45,-8.5)
-        self.model_matrix.add_scale(10,0.1,19)
-        self.shader.set_model_matrix(self.model_matrix.matrix)
-        self.cube.draw(self.shader)
-        self.model_matrix.pop_matrix()
-        
-        self.model_matrix.push_matrix()
-        self.model_matrix.add_translation(-5,0,-7.5)
-        self.model_matrix.add_scale(0.1,1,17)
-        self.shader.set_model_matrix(self.model_matrix.matrix)
-        self.cube.draw(self.shader)
-        self.model_matrix.pop_matrix()
-
-        self.model_matrix.push_matrix()
-        self.model_matrix.add_translation(0,0,-18)
-        self.model_matrix.add_scale(10,1,0.1)
-        self.shader.set_model_matrix(self.model_matrix.matrix)
-        self.cube.draw(self.shader)
-        self.model_matrix.pop_matrix()
-
-        self.model_matrix.push_matrix()
-        self.model_matrix.add_translation(0,0,1)
-        self.model_matrix.add_scale(10,1,0.1)
-        self.shader.set_model_matrix(self.model_matrix.matrix)
-        self.cube.draw(self.shader)
-        self.model_matrix.pop_matrix()
-
-        self.model_matrix.push_matrix()
-        self.model_matrix.add_translation(5,0,-10)
-        self.model_matrix.add_scale(0.1,1,17)
-        self.shader.set_model_matrix(self.model_matrix.matrix)
-        self.cube.draw(self.shader)
-        self.model_matrix.pop_matrix()
-
-        for wall in self.wallList:
-            self.model_matrix.push_matrix()
-            self.model_matrix.add_translation(wall.position.x,wall.position.y,wall.position.z)
-            self.model_matrix.add_scale(wall.scale.x,wall.scale.y,wall.scale.z)
-            self.shader.set_model_matrix(self.model_matrix.matrix)
-            self.cube.draw(self.shader)
-            self.model_matrix.pop_matrix()
+        if self.stage == 1:
+            self.displayChallenge1()
+        if self.stage == 2:
+            self.displayChallenge2()
 
         
 
         pos = self.model_matrix.yaw(cos(radians(self.view_matrix.jaw)),sin(radians(self.view_matrix.jaw)),Point(self.player.position.x - 1, 0.1, self.player.position.z - 0.5),self.view_matrix.eye)
-
-        
-        
         if self.active_slot == 1:
             glActiveTexture(GL_TEXTURE0)
             glBindTexture(GL_TEXTURE_2D,self.rifleTextureID)
@@ -409,59 +588,136 @@ class GraphicsProgram3D:
             self.karambit.draw(self.shader, True)
             self.model_matrix.pop_matrix()
 
-        for shot in self.shotlist:
-            self.shader.set_material_diffuse(Color(1,0.5,0))
-            self.model_matrix.push_matrix()
-            self.model_matrix.add_translation(shot.position.x,shot.position.y,shot.position.z)
-            self.model_matrix.add_scale(shot.scale.x,shot.scale.y,shot.scale.z)
-            self.shader.set_model_matrix(self.model_matrix.matrix)
-            self.cube.draw(self.shader)
-            self.model_matrix.pop_matrix()
+        glDisable(GL_DEPTH_TEST)
+        glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
 
+        self.sprite_shader.use()
+        self.sprite_shader.set_projection_matrix(self.projection_matrix.get_matrix())
+        self.sprite_shader.set_view_matrix(self.view_matrix.get_matrix())
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D,self.playerTextureID)
-        self.shader.set_diffuse_texture(0)
-        self.shader.set_using_texture()
-        for enemy in self.activeEnemyList:
-            self.model_matrix.push_matrix()
-            self.model_matrix.add_translation(enemy.position.x,-0.4,enemy.position.z)
-            self.model_matrix.add_rotate_y(pi)
-            self.model_matrix.add_scale(0.1,0.1,0.1)
-            self.shader.set_model_matrix(self.model_matrix.matrix)
-            self.enemy.draw(self.shader, True)
-            self.model_matrix.pop_matrix()
-        self.shader.set_not_using_texture()
-
-        # glActiveTexture(GL_TEXTURE0)
-        # glBindTexture(GL_TEXTURE_2D,self.saturnTextureID)
-        # self.shader.set_diffuse_texture(0)
-        # self.shader.set_using_texture()
-        # self.model_matrix.push_matrix()
-        # self.model_matrix.add_translation(0, 0.1, -3)
-        # self.model_matrix.add_scale(1,1,1)
-        # self.shader.set_model_matrix(self.model_matrix.matrix)
-        # self.saturn.draw(self.shader, True)
-        # self.model_matrix.pop_matrix()
-
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D,self.starsTextureID)
-        self.shader.set_diffuse_texture(0)
-        self.shader.set_using_texture()
+        glBindTexture(GL_TEXTURE_2D, self.crosshairTextureID)
+        self.sprite_shader.set_diffuse_texture(0)
+        glActiveTexture(GL_TEXTURE1)
+        glBindTexture(GL_TEXTURE_2D, self.crosshairAlphaTextureID)
+        self.sprite_shader.set_alpha_texture(1)
+        self.sprite_shader.set_opacity(1.0)
         self.model_matrix.push_matrix()
-        self.model_matrix.add_translation(0, 0.1, -3)
-        self.model_matrix.add_scale(17,17,17)
-        self.shader.set_model_matrix(self.model_matrix.matrix)
-        self.saturn.draw(self.shader, True)
+        self.model_matrix.add_translation(self.view_matrix.eye.x-self.view_matrix.n.x, self.view_matrix.eye.y - self.view_matrix.n.y, self.view_matrix.eye.z-self.view_matrix.n.z)
+        self.model_matrix.add_rotate_y(pi/2)
+        self.model_matrix.add_rotate_y(-self.view_matrix.jaw*pi/180)
+        self.model_matrix.add_scale(0.1, 0.1, 0.1)
+        self.sprite_shader.set_model_matrix(self.model_matrix.matrix)
+        self.sprite.draw(self.sprite_shader)
         self.model_matrix.pop_matrix()
 
+        # You win screen
+        if self.winning:
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, self.youWinTextureID)
+            self.sprite_shader.set_diffuse_texture(0)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, self.youWinAlphaTextureID)
+            self.sprite_shader.set_alpha_texture(1)
+            self.sprite_shader.set_opacity(1.0)
+            self.model_matrix.push_matrix()
+            self.model_matrix.add_translation(self.view_matrix.eye.x-self.view_matrix.n.x, self.view_matrix.eye.y - self.view_matrix.n.y, self.view_matrix.eye.z-self.view_matrix.n.z)
+            self.model_matrix.add_rotate_y(pi/2)
+            self.model_matrix.add_rotate_y(-self.view_matrix.jaw*pi/180)
+            self.model_matrix.add_scale(1, 1, 1)
+            self.sprite_shader.set_model_matrix(self.model_matrix.matrix)
+            self.sprite.draw(self.sprite_shader)
+            self.model_matrix.pop_matrix()
 
-        self.shader.set_material_diffuse(Color(0,10,0))
-        self.model_matrix.push_matrix()
-        self.model_matrix.add_translation(self.view_matrix.eye.x - self.view_matrix.n.x, self.view_matrix.eye.y - self.view_matrix.n.y, self.view_matrix.eye.z - self.view_matrix.n.z)
-        self.model_matrix.add_scale(0.0005,0.0005,0.0005)
-        self.shader.set_model_matrix(self.model_matrix.matrix)
-        self.crosshair.draw(self.shader, True)
-        self.model_matrix.pop_matrix()
+        if self.losing:
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, self.youLoseTextureID)
+            self.sprite_shader.set_diffuse_texture(0)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, self.youLoseAlphaTextureID)
+            self.sprite_shader.set_alpha_texture(1)
+            self.sprite_shader.set_opacity(1.0)
+            self.model_matrix.push_matrix()
+            self.model_matrix.add_translation(self.view_matrix.eye.x-self.view_matrix.n.x, self.view_matrix.eye.y - self.view_matrix.n.y, self.view_matrix.eye.z-self.view_matrix.n.z)
+            self.model_matrix.add_rotate_y(pi/2)
+            self.model_matrix.add_rotate_y(-self.view_matrix.jaw*pi/180)
+            self.model_matrix.add_scale(1, 1, 1)
+            self.sprite_shader.set_model_matrix(self.model_matrix.matrix)
+            self.sprite.draw(self.sprite_shader)
+            self.model_matrix.pop_matrix()
+
+        if self.begin:
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, self.startTextureID)
+            self.sprite_shader.set_diffuse_texture(0)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, self.startAlphaTextureID)
+            self.sprite_shader.set_alpha_texture(1)
+            self.sprite_shader.set_opacity(1.0)
+            self.model_matrix.push_matrix()
+            self.model_matrix.add_translation(self.view_matrix.eye.x-self.view_matrix.n.x, self.view_matrix.eye.y - self.view_matrix.n.y, self.view_matrix.eye.z-self.view_matrix.n.z)
+            self.model_matrix.add_rotate_y(pi/2)
+            self.model_matrix.add_rotate_y(-self.view_matrix.jaw*pi/180)
+            self.model_matrix.add_scale(1, 1, 1)
+            self.sprite_shader.set_model_matrix(self.model_matrix.matrix)
+            self.sprite.draw(self.sprite_shader)
+            self.model_matrix.pop_matrix()
+
+        if self.stage == 1 and self.begin == False and self.aimbots.active == False and self.aimbots.killCount == None:
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, self.stage1TextureID)
+            self.sprite_shader.set_diffuse_texture(0)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, self.stage1AlphaTextureID)
+            self.sprite_shader.set_alpha_texture(1)
+            self.sprite_shader.set_opacity(1.0)
+            self.model_matrix.push_matrix()
+            self.model_matrix.add_translation(self.view_matrix.eye.x-self.view_matrix.n.x, self.view_matrix.eye.y - self.view_matrix.n.y, self.view_matrix.eye.z-self.view_matrix.n.z)
+            self.model_matrix.add_rotate_y(pi/2)
+            self.model_matrix.add_rotate_y(-self.view_matrix.jaw*pi/180)
+            self.model_matrix.add_scale(1, 1, 1)
+            self.sprite_shader.set_model_matrix(self.model_matrix.matrix)
+            self.sprite.draw(self.sprite_shader)
+            self.model_matrix.pop_matrix()
+
+        if self.stage == 2 and self.begin == False and self.flick.active == False and self.flick.killCount == None:
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, self.stage2TextureID)
+            self.sprite_shader.set_diffuse_texture(0)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, self.stage2AlphaTextureID)
+            self.sprite_shader.set_alpha_texture(1)
+            self.sprite_shader.set_opacity(1.0)
+            self.model_matrix.push_matrix()
+            self.model_matrix.add_translation(self.view_matrix.eye.x-self.view_matrix.n.x, self.view_matrix.eye.y - self.view_matrix.n.y, self.view_matrix.eye.z-self.view_matrix.n.z)
+            self.model_matrix.add_rotate_y(pi/2)
+            self.model_matrix.add_rotate_y(-self.view_matrix.jaw*pi/180)
+            self.model_matrix.add_scale(1, 1, 1)
+            self.sprite_shader.set_model_matrix(self.model_matrix.matrix)
+            self.sprite.draw(self.sprite_shader)
+            self.model_matrix.pop_matrix()
+
+        if self.stage == 2:
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, self.targetTextureID)
+            self.sprite_shader.set_diffuse_texture(0)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, self.targetAlphaTextureID)
+            self.sprite_shader.set_alpha_texture(1)
+            self.sprite_shader.set_opacity(1.0)
+            self.model_matrix.push_matrix()
+            self.model_matrix.add_translation(self.flick.circle.position.x, self.flick.circle.position.y, self.flick.circle.position.z)
+            self.model_matrix.add_scale(2,1,1)
+            self.sprite_shader.set_model_matrix(self.model_matrix.matrix)
+            self.sprite.draw(self.sprite_shader)
+            self.model_matrix.pop_matrix()
+
+        
+        glDisable(GL_BLEND)
+
+
         
         pygame.display.flip()
 
@@ -476,13 +732,117 @@ class GraphicsProgram3D:
         self.model_matrix.add_rotate_y(y)
         self.model_matrix.add_rotate_z(self.view_matrix.jaw/50)
 
-    def spawnEnemy(self):
-        while True:
-            for enemy in self.enemyList:
-                if enemy not in self.activeEnemyList and enemy.position != self.lastSpawn:
-                    self.lastSpawn = enemy.position
-                    return enemy
-      
+    def spawnEnemy(self, lastEnemy = None):
+        newEnemy = self.enemyList[randint(0,len(self.enemyList)-1)]
+        while newEnemy in self.activeEnemyList or lastEnemy == newEnemy:
+            newEnemy = self.enemyList[randint(0,len(self.enemyList)-1)]
+        return newEnemy
+
+    def displayChallenge1(self):
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D,self.wallTextureID)
+        self.shader.set_diffuse_texture(0)
+        self.shader.set_using_texture()
+
+        #CHALLANGE BOX
+        self.model_matrix.push_matrix()
+        self.model_matrix.add_translation(self.challengeBox.position.x,self.challengeBox.position.y,self.challengeBox.position.z )
+        self.model_matrix.add_scale(self.challengeBox.scale.x,self.challengeBox.scale.y,self.challengeBox.scale.z)
+        self.shader.set_model_matrix(self.model_matrix.matrix)
+        self.cube.draw(self.shader)
+        self.model_matrix.pop_matrix()
+
+        #floor
+        self.model_matrix.push_matrix()
+        self.model_matrix.add_translation(0,-0.45,-8.5)
+        self.model_matrix.add_scale(19,0.1,19)
+        self.shader.set_model_matrix(self.model_matrix.matrix)
+        self.cube.draw(self.shader)
+        self.model_matrix.pop_matrix()
+        
+        
+        self.model_matrix.push_matrix()
+        self.model_matrix.add_translation(-9.5,0,-8.5)
+        self.model_matrix.add_scale(0.1,1,19)
+        self.shader.set_model_matrix(self.model_matrix.matrix)
+        self.cube.draw(self.shader)
+        self.model_matrix.pop_matrix()
+
+        self.model_matrix.push_matrix()
+        self.model_matrix.add_translation(0,0,-18)
+        self.model_matrix.add_scale(19,1,0.1)
+        self.shader.set_model_matrix(self.model_matrix.matrix)
+        self.cube.draw(self.shader)
+        self.model_matrix.pop_matrix()
+        #LEFT
+        self.model_matrix.push_matrix()
+        self.model_matrix.add_translation(0,0,1)
+        self.model_matrix.add_scale(19,1,0.1)
+        self.shader.set_model_matrix(self.model_matrix.matrix)
+        self.cube.draw(self.shader)
+        self.model_matrix.pop_matrix()
+        #BOTTOM
+        self.model_matrix.push_matrix()
+        self.model_matrix.add_translation(9.5,0,-8.5)
+        self.model_matrix.add_scale(0.1,1,19)
+        self.shader.set_model_matrix(self.model_matrix.matrix)
+        self.cube.draw(self.shader)
+        self.model_matrix.pop_matrix()
+
+
+        ###################
+        # Drawing Enemies #
+        ###################
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D,self.playerTextureID)
+        self.shader.set_diffuse_texture(0)
+        self.shader.set_using_texture()
+        for enemy in self.activeEnemyList:
+            self.model_matrix.push_matrix()
+            self.model_matrix.add_translation(enemy.position.x,-0.4,enemy.position.z)
+            if enemy.yRotation != None:
+                self.model_matrix.add_rotate_y(enemy.yRotation)
+            self.model_matrix.add_scale(0.1,0.1,0.1)
+            self.shader.set_model_matrix(self.model_matrix.matrix)
+            self.enemy.draw(self.shader, True)
+            self.model_matrix.pop_matrix()
+        self.shader.set_not_using_texture()
+
+
+    def displayChallenge2(self):
+
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D,self.wallTextureID)
+        self.shader.set_diffuse_texture(0)
+        self.shader.set_using_texture()
+
+        #CHALLANGE BOX
+        self.model_matrix.push_matrix()
+        self.model_matrix.add_translation(self.challengeBox.position.x,self.challengeBox.position.y,self.challengeBox.position.z )
+        self.model_matrix.add_scale(self.challengeBox.scale.x,self.challengeBox.scale.y,self.challengeBox.scale.z)
+        self.shader.set_model_matrix(self.model_matrix.matrix)
+        self.cube.draw(self.shader)
+        self.model_matrix.pop_matrix()
+        
+        #floor
+        self.model_matrix.push_matrix()
+        self.model_matrix.add_translation(0,-0.45,-8.5)
+        self.model_matrix.add_scale(19,0.1,19)
+        self.shader.set_model_matrix(self.model_matrix.matrix)
+        self.cube.draw(self.shader)
+        self.model_matrix.pop_matrix()
+
+       
+        #wall
+        self.shader.set_material_diffuse(Color(100,100,100))
+        self.shader.set_not_using_texture()
+        self.model_matrix.push_matrix()
+        self.model_matrix.add_translation(0,0,0)
+        self.model_matrix.add_scale(19,10,1)
+        self.shader.set_model_matrix(self.model_matrix.matrix)
+        self.cube.draw(self.shader)
+        self.model_matrix.pop_matrix()
+
     def program_loop(self):
         exiting = False
         while not exiting:
@@ -492,13 +852,13 @@ class GraphicsProgram3D:
                     print("Quitting!")
                     exiting = True
                 elif event.type == pygame.KEYDOWN:
-                    print(event.type)
                     if event.key == K_ESCAPE:
                         print("Escaping!")
                         exiting = True
                         
                     if event.key == K_UP:
                         self.UP_key_down = True
+                        self.aimbots.startChallenge()
 
                     if event.key == K_w:
                         self.w_key_down = True
@@ -516,21 +876,38 @@ class GraphicsProgram3D:
                         self.space_key_down = True
 
                     if event.key == K_1:
-                        self.active_slot = 1
-                        self.player.velocity = 2
+                        if self.active_slot != 1:
+                            self.active_slot = 1
+                            self.player.velocity = 2
+                            self.soundboard.stopPistolDeploy()
+                            self.soundboard.stopKnifeDeploy()
+                            self.soundboard.playAkDeploy()
 
                     if event.key == K_2:
-                        self.active_slot = 2
-                        self.player.velocity = 2.2
+                        if self.active_slot != 2:
+                            self.active_slot = 2
+                            self.player.velocity = 2.2
+                            self.soundboard.stopAkDeploy()
+                            self.soundboard.stopKnifeDeploy()
+                            self.soundboard.playPistolDeploy()
 
                     if event.key == K_3:
-                        self.active_slot = 3
-                        self.player.velocity = 2.5
+                        if self.active_slot != 3:
+                            self.active_slot = 3
+                            self.player.velocity = 2.5
+                            self.soundboard.stopPistolDeploy()
+                            self.soundboard.stopAkDeploy()
+                            self.soundboard.playKnifeDeploy()
 
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if len(self.shotlist) < 26 and not self.active_slot == 3:
                         self.generateShot()
+                        if self.active_slot == 1:
+                            self.soundboard.playAkShoot()
+                        elif self.active_slot == 2:
+                            self.soundboard.playPistolShoot()
                     if self.active_slot == 3:
+                        self.soundboard.playKnifeWiff()
                         self.knifing = True
                 if event.type == pygame.MOUSEBUTTONUP:
                     self.knifing = False

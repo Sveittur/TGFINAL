@@ -1,0 +1,29 @@
+{
+  "name": "tg_game_server",
+  "version": "1.0.0",
+  "description": "A backend to handle todo notes.",
+  "main": "serverr.js",
+  "scripts": {
+    "test": "node_modules/mocha/bin/mocha test/todosAllNPModified.test.js",
+    "start": "node serverr.js",
+    "debug": "node --inspect-brk=9229 todosAllNPModified.js"
+  },
+  "keywords": [
+    "Todo notes",
+    "REST",
+    "VEFF213",
+    "Final exam",
+    "Scary"
+  ],
+  "author": "Grischa Liebel",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.17.1"
+  },
+  "devDependencies": {
+    "chai": "^4.3.4",
+    "chai-http": "^4.3.0",
+    "mocha": "^8.3.2"
+  }
+}

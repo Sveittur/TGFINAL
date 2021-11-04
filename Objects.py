@@ -233,23 +233,36 @@ class MeshModel:
             glBindBuffer(GL_ARRAY_BUFFER, 0)
 
 class GameObject():
-    def __init__(self, position,scale , vector = None):
+    def __init__(self, position,scale , vector = None, yRotation = None):
         self.position = position
         self.scale = scale
         self.minX = self.position.x - scale.x/2
         self.maxX = self.position.x + scale.x/2
         self.minZ = self.position.z - scale.z/2
         self.maxZ = self.position.z + scale.z/2
-        self.minY = self.position.y - scale.y/2
-        self.maxY = self.position.y + scale.y/2
+        if self.position.y < 0:
+            self.minY = 0 - scale.y/2
+            self.maxY = 0 + scale.y/2
+        else:
+            self.minY = self.position.y - scale.y/2
+            self.maxY = self.position.y + scale.y/2
+        self.yRotation = yRotation
         self.vector = vector
+        self.health = 100
 
-    def update(self, newPos):
-        self.position = newPos
+    def update(self, newPos = None):
+        if newPos != None:
+            self.position = newPos
         self.minX = self.position.x - self.scale.x/2
         self.maxX = self.position.x + self.scale.x/2
         self.minZ = self.position.z - self.scale.z/2
         self.maxZ = self.position.z + self.scale.z/2 
+        if self.position.y < 0:
+            self.minY = 0 - self.scale.y/2
+            self.maxY = 0 + self.scale.y/2
+        else:
+            self.minY = self.position.y - self.scale.y/2
+            self.maxY = self.position.y + self.scale.y/2
     
     def checkIntersection(self, other):
         return (self.minX <= other.maxX and self.maxX >= other.minX) and \
@@ -357,3 +370,60 @@ class player():
     def jumpDown(self):
         self.position.y -= 0.1
 
+class Sprite:
+    def __init__(self):
+        vertex_array = [-0.5, -0.5, 0.0, 0.0, 0.0,
+                               -0.5, 0.5, 0.0, 0.0, 1.0,
+                               0.5, 0.5, 0.0, 1.0, 1.0,
+                               0.5, -0.5, 0.0, 1.0, 0.0]
+        self.vertex_buffer_id = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, self.vertex_buffer_id)
+        glBufferData(GL_ARRAY_BUFFER, np.array(vertex_array, dtype='float32'), GL_STATIC_DRAW)
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        vertex_array = None
+
+    def draw(self, sprite_shader):
+        sprite_shader.set_attribute_buffers(self.vertex_buffer_id)
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4)
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+
+class SkySphere:
+    def __init__(self, stacks=6, slices=12):
+        vertex_array = []
+        self.slices = slices
+
+        stack_interval = pi / stacks
+        slice_interval = 2.0 * pi / slices
+        self.vertex_count = 0
+
+        for stack_count in range(stacks // 2):
+            stack_angle = stack_count * stack_interval
+            for slice_count in range(slices + 1):
+                slice_angle = slice_count * slice_interval
+                vertex_array.append(sin(stack_angle) * cos(slice_angle))
+                vertex_array.append(cos(stack_angle))
+                vertex_array.append(sin(stack_angle) * sin(slice_angle))
+
+                vertex_array.append(slice_count / slices)
+                vertex_array.append(1.0 - (stack_count / stacks)*2)
+
+                vertex_array.append(sin(stack_angle + stack_interval) * cos(slice_angle))
+                vertex_array.append(cos(stack_angle + stack_interval))
+                vertex_array.append(sin(stack_angle + stack_interval) * sin(slice_angle))
+
+                vertex_array.append(slice_count / slices)
+                vertex_array.append(1.0 - ((stack_count + 1) / stacks) * 2)
+
+                self.vertex_count += 2
+        self.vertex_buffer_id = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, self.vertex_buffer_id)
+        glBufferData(GL_ARRAY_BUFFER, np.array(vertex_array, dtype="float32"), GL_STATIC_DRAW)
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        vertex_array = None
+
+    def draw(self, sprite_shader):
+        """ Sets the drawing mode and draws the sphere """
+        sprite_shader.set_attribute_buffers(self.vertex_buffer_id)
+        for i in range(0, self.vertex_count, (self.slices + 1) * 2):
+            glDrawArrays(GL_TRIANGLE_STRIP, i, (self.slices + 1) * 2)
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
